@@ -37,51 +37,11 @@ total$year_feature2 = ifelse(total$YearRemodAdd <= 1950, 1,
                                     3))
 
 
+total$year_feature3_diff = total$YrSold - total$YearBuilt
+total$year_feature4_diff_remod = total$YrSold - total$YearRemodAdd
 total$year_feature = as.factor(total$year_feature)
 total$year_feature2 = as.factor(total$year_feature2)
 
-
-###imput missing features and rerun the model
-
-
-x = ('year_feature2+BsmtFullBath+year_feature+GrLivArea+MSSubClass+OverallQual+Neighborhood+LotArea+OverallCond+BsmtFinSF1+GarageCars+BsmtQual')
-x
-strsplit(x, "+")
-strsplit(x, "\\+")
-names1=strsplit(x, "\\+")
-names1
-names1 = as.vector(names1)
-names1
-length(names1)
-names1=as.vector(strsplit(x, "\\+"))
-names1
-names1=names1[[1]]
-names1
-
-train1=train_home[colnames(train_home) %in% names1]
-apply(train1, 2, FUN = function(x) (sum(is.na(x))))
-train1$BsmtQual
-mice(train1, m = 1)
-train_mice=mice(train1, m = 1)
-train_mice$imp$BsmtQual$`1`
-train1$BsmtQual[is.na(train1$BsmtQual)] = train_mice$imp$BsmtQual$`1`
-test_home = as_data_frame(test_home)
-test1 = test_home[colnames(test_home) %in% names1]
-apply(test1, 2, FUN = function(x) (sum(is.na(x))))
-test_mice=mice(test1, m=1, method = "cart")
-test1$BsmtQual[is.na(test1$BsmtQual)]=test_mice$imp$BsmtQual$`1`
-test1$BsmtFinSF1[is.na(test1$BsmtFinSF1)]=test_mice$imp$BsmtFinSF1$`1`
-test1$BsmtFullBath[is.na(test1$BsmtFullBath)]=test_mice$imp$BsmtFullBath$`1`
-test1$GarageCars[is.na(test1$GarageCars)]=test_mice$imp$GarageCars$`1`
-
-train1 = cbind.data.frame(train_home$SalePrice, train1)
-names(train1)[1]=c("SalePrice")
-model1 = glm(SalePrice ~ year_feature2+BsmtFullBath+year_feature+LotArea*GrLivArea+MSSubClass+OverallQual+Neighborhood+BsmtFinSF1+GarageCars+BsmtQual, data = train1)
-summary(model1)
-sales=predict(model1, test1)
-sub=cbind.data.frame(test_home$Id, sales)
-colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_19dec_144pm.csv')
 
 
 
@@ -155,12 +115,18 @@ total$Exterior1st = as.character(total$Exterior1st)
 total$Exterior2nd = as.character(total$Exterior2nd)
 total$Exterior1st=if_else(total$Exterior1st %in% Ext1, "other", total$Exterior1st)
 total$Exterior2nd=if_else(total$Exterior2nd %in% Ext2, "other", total$Exterior2nd)
+total$SaleCondition = ifelse(total$SaleCondition=="Normal", 1, 2)
+total$SaleType = ifelse(total$SaleType == "WD", 1, 
+                        ifelse(total$SaleType == "New", 2, 
+                               3))
 
-
+total$GarageQual = ifelse(total$GarageQual == "TA", 1, 2)
 #assign factors to gargaedate
+
 total$year_garage2 = ifelse(total$GarageYrBlt <= 1950, 1,
                             ifelse(total$GarageYrBlt >= 1951 & total$GarageYrBlt <= 2000, 2,
                                    3))
+
 ##asgin remod year
 total$remodel_feature = ifelse(total$YearRemodAdd == total$YrSold, 1, 2)
 total$year_garage2 = as.factor(total$year_garage2)
@@ -180,12 +146,12 @@ colnames(total)[68] =c("Porch_3ssn")
 train_home = total[1:1460,]
 test_home = total[1461:nrow(total),]
 
-mod1=glm(SalePrice~GrLivArea+remodel_feature+LotArea+BsmtFullBath+FullBath+GarageCars+GarageType+Neighborhood+OverallQual+BsmtExposure+BsmtFinSF1+BsmtFinSF2+KitchenQual+ScreenPorch+year_feature+year_feature2+year_garage2, data = train_home)
+mod1=glm(SalePrice~SaleCondition+BldgType+GrLivArea+remodel_feature+LotArea+BsmtFullBath+GarageCars+GarageType+Neighborhood+OverallQual+BsmtExposure+BsmtFinSF1+BsmtFinSF2+KitchenQual+ScreenPorch+year_feature+year_garage2, data = train_home)
 summary(mod1)
 sales=predict(mod1, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_20dec_3.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_21dec_2.csv')
 
 mod2=glm(SalePrice~RoofMatl+floor1_SF+floor2_SF+Condition2+Neighborhood+LotArea+BsmtFinSF1+OverallQual+year_feature+GrLivArea+MSSubClass+GarageCars+BsmtQual, data = train_home)
 sales=predict(mod2, test_home)
@@ -195,12 +161,23 @@ write_csv(sub, path = '~/Desktop/sub_housing_19dec_423pm.csv')
 
 
 require(randomForest)
-rf_model <- randomForest(SalePrice~.-Id, data = train_home, ntree=800)
+rf_model <- randomForest(SalePrice~.-Id, data = train_home)
 predict(rf_model, test_home)
+importance=importance(rf_model)
+
+varImportance <- data.frame(Variables = row.names(importance), 
+Importance = round(importance[ ,1]))
+
+# Create a rank variable based on importance
+rankImportance <- varImportance %>% mutate(Rank = paste0('#',dense_rank(desc(Importance))))
+
+# Use ggplot2 to visualize the relative importance of variables
+ggplot(rankImportance, aes(x = reorder(Variables, Importance), y = Importance, fill = Importance)) +geom_bar(stat='identity') + geom_text(aes(x = Variables, y = 0.5, label = Rank),hjust=0, vjust=0.55, size = 4, colour = 'red') +labs(x = 'Variables') +coord_flip()
+
 sales=predict(rf_model, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_19dec_443pm.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_21dec_rfmodel2.csv')
 
 
 
@@ -211,6 +188,7 @@ test_home2 =test_home[-c(1, 19, 20, 73, 76)]
 test_mm2 = model.matrix(~., test_home2)
 mm1= model.matrix(~., train_home2)
 price = train_home$SalePrice/1000
+require(glmnet)
 glmmodel = cv.glmnet(x=mm1, y=price, family = "gaussian", type.measure = "deviance", alpha = 0.6, nfolds = 10)
 plot(glmmodel)
 glmmodel$lambda
@@ -266,6 +244,49 @@ sales=predict(gbmFit1, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_20dec_grid1.csv')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 cat_var <- names(home_train)[which(sapply(home_train, is.character))]
