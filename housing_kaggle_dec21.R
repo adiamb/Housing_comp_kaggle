@@ -246,45 +246,69 @@ colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_20dec_grid1.csv')
 
 
+###simple XGB boost
+
+mmsparse = model.matrix(~.,train_home[-c(1, 73, 76, 6, 9, 58, 19, 20)])
+data1=Matrix(mmsparse, sparse = T)
+train1= list(train_home$SalePrice, data1)
+
+names(train1) = c("label", "data")
+bstSparse=xgboost(data = train1$data, label = train1$label, max.depth = 2, eta = 1, nthread = 2, nround = 2)
 
 
 
+mmsparse2 = model.matrix(~.,test_home[-c(1, 73, 76, 6, 9, 58, 19, 20)])
+data2 = Matrix(mmsparse2, sparse = T)
+sales = predict(bstSparse, data2)
+sub=cbind.data.frame(test_home$Id, sales)
+colnames(sub) = c("Id", "SalePrice")
+write_csv(sub, path = '~/Desktop/sub_housing_21dec_XGBboost.csv')
+
+require(caret)
+### train an XGB boost model - split training data into test and training by caret package
+inTraining <- createDataPartition(train_home$SalePrice, p = .75, list = FALSE)
+training <- train_home[ inTraining,]
+testing  <-train_home[-inTraining,]
+train = model.matrix(~., training[-c(1, 73, 76, 6, 9, 58, 19, 20)])
+train1 = Matrix(train, sparse = T)
+test = model.matrix(~., testing[-c(1, 73, 76, 6, 9, 58, 19, 20)])
+test1 = Matrix(test, sparse = T)
+trainlabel = training$SalePrice
+testlabel = testing$SalePrice
+
+trainlist = list(trainlabel, train1)
+testlist = list(testlabel, test1)
+
+names(trainlist)= c("label", "data")
+names(testlist)= c("label", "data")
+
+dtrain <- xgb.DMatrix(data = trainlist$data, label=trainlist$label)
+dtest <- xgb.DMatrix(data = testlist$data, label=testlist$label)
+
+watchlist <- list(train=dtrain, test=dtest)
+
+bst <- xgb.train(data=dtrain, max_depth=800, booster = "gblinear", nthread = 4, nrounds=20000, watchlist=watchlist, verbose = T, eval_metric = "error")
+
+label = getinfo(dtest, "label")
+pred <- predict(bst, dtest)
+err <- as.numeric(sum(as.integer(pred > 0.5) != label))/length(label)
+print(paste("test-error=", err))
 
 
+model <- xgb.dump(bst, with.stats = T)
+names=dimnames(train1)[[2]]
+importance_matrix <- xgb.importance(names, model = bst)
+print(importance_matrix)
+xgb.plot.importance(importance_matrix = importance_matrix)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+##predict
+test_home = as.data.frame(test_home)
+mmsparse2 = model.matrix(~.,test_home[-c(1, 73, 76, 6, 9, 58, 19, 20)])
+data2 = Matrix(mmsparse2, sparse = T)
+sales = predict(bst, data2)
+sub=cbind.data.frame(test_home$Id, sales)
+colnames(sub) = c("Id", "SalePrice")
+write_csv(sub, path = '~/Desktop/sub_housing_21dec_XGBboost3.csv')
 
 
 
