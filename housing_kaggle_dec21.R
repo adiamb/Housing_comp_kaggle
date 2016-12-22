@@ -11,7 +11,7 @@ require(mice)
 home_train = fread('~/Downloads/Houisng_kaggle_Dec19/train_house.csv', header = T, sep = ";", stringsAsFactors = T)
 home_test = fread('~/Downloads/Houisng_kaggle_Dec19/test.csv', stringsAsFactors = T)
 total = rbind.data.frame(home_train, home_test, fill = T)
-
+plot(total$SalePrice, total$GrLivArea)
 total$OverallCond = as.factor(total$OverallCond)
 total$OverallQual= as.factor(total$OverallQual)
 #total$YearBuilt = as.character(as.numeric(total$YearBuilt))
@@ -144,6 +144,7 @@ colnames(total)[43:44]=c("floor1_SF", "floor2_SF")
 colnames(total)[68] =c("Porch_3ssn")
 ##split into test and train
 train_home = total[1:1460,]
+train_home = filter(train_home, train_home$GrLivArea <= 4000) #remove outliers
 test_home = total[1461:nrow(total),]
 
 mod1=glm(SalePrice~SaleCondition+BldgType+GrLivArea+remodel_feature+LotArea+BsmtFullBath+GarageCars+GarageType+Neighborhood+OverallQual+BsmtExposure+BsmtFinSF1+BsmtFinSF2+KitchenQual+ScreenPorch+year_feature+year_garage2, data = train_home)
@@ -265,6 +266,7 @@ colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_21dec_XGBboost.csv')
 
 require(caret)
+require(xgboost)
 ### train an XGB boost model - split training data into test and training by caret package
 inTraining <- createDataPartition(train_home$SalePrice, p = .75, list = FALSE)
 training <- train_home[ inTraining,]
@@ -287,7 +289,7 @@ dtest <- xgb.DMatrix(data = testlist$data, label=testlist$label)
 
 watchlist <- list(train=dtrain, test=dtest)
 
-bst <- xgb.train(data=dtrain, max_depth=800, booster = "gblinear", nthread = 4, nrounds=20000, watchlist=watchlist, verbose = T, eval_metric = "error")
+bst <- xgb.train(data=dtrain, max_depth=12, eta=0.02, alpha = 1,min_child_weight = 1,gamma = 2,nthread = 4, objective = 'reg:linear',  nrounds=20000, watchlist=watchlist, verbose = T, eval_metric = "error")
 
 label = getinfo(dtest, "label")
 pred <- predict(bst, dtest)
@@ -308,7 +310,38 @@ data2 = Matrix(mmsparse2, sparse = T)
 sales = predict(bst, data2)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_21dec_XGBboost3.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_22dec_XGBboost1.csv')
+
+xgb_params = list(
+  verbose =T,
+  colsample_bytree = 0.5,
+  subsample = 0.8,
+  eta = 0.02, 
+  objective = 'reg:linear',
+  max_depth = 12,
+  alpha = 1,
+  gamma = 2,
+  min_child_weight = 1,
+  base_score = 7.76
+)
+
+xg_eval_mae <- function (yhat, dtrain) {
+  y = getinfo(dtrain, "label")
+  err= mae(exp(y),exp(yhat) )
+  return (list(metric = "error", value = err))
+}
+
+best_n_rounds=15000 # try more rounds
+
+#train data
+gb_dt=xgb.train(xgb_params,dtrain,nrounds = as.integer(best_n_rounds))
+
+
+
+
+
+
+
 
 
 
