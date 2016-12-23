@@ -16,15 +16,7 @@ total$OverallCond = as.factor(total$OverallCond)
 total$OverallQual= as.factor(total$OverallQual)
 #total$YearBuilt = as.character(as.numeric(total$YearBuilt))
 #total$YearRemodAdd = as.character(as.numeric(total$YearRemodAdd))
-total$YrSold = as.factor(total$YrSold)
-total$BsmtHalfBath = as.factor(total$BsmtHalfBath)
-total$BsmtFullBath = as.factor(total$BsmtFullBath)
-total$FullBath = as.factor(total$FullBath)
-total$HalfBath = as.factor(total$HalfBath)
-total$BedroomAbvGr = as.factor(total$BedroomAbvGr)
-total$KitchenAbvGr = as.factor(total$KitchenAbvGr)
-total$TotRmsAbvGrd = as.factor(total$TotRmsAbvGrd)
-total$MoSold = as.factor(total$MoSold)
+
 total$year_feature = ifelse(total$YearBuilt <= 1900, 1,
                             ifelse(total$YearBuilt >= 1901 & total$YearBuilt <= 1930, 2,
                                    ifelse(total$YearBuilt >= 1931 & total$YearBuilt <= 1960, 3,
@@ -96,25 +88,30 @@ str(total)
 
 ##do some feature enigneering 
 total$MSZoning = ifelse(total$MSZoning == "RL", 1, 2)
+total$MSZoning = as.factor(total$MSZoning)
 total$LotShape = ifelse(total$LotShape == "Reg", 1, 2)
+total$LotShape = as.factor(total$LotShape)
 total$LandContour = ifelse(total$LandContour == "Lvl", 1, 2)
+total$LandContour = as.factor(total$LandContour)
 total$LotConfig = ifelse(total$LotConfig == "Inside", 1, 2)
+total$LotConfig = as.factor(total$LotConfig)
 total$LandSlope = ifelse(total$LandSlope == "Gtl", 1, 2)
+total$LandSlope = as.factor(total$LandSlope)
 total$Condition1 = ifelse(total$Condition1 == "Norm", 1, 2)
+total$Condition1 = as.factor(total$Condition1)
+total$Condition2 = as.factor(total$Condition2)
 total$Condition2 = ifelse(total$Condition2 == "Norm", 1, 2)
 total$HouseStyle = ifelse(total$HouseStyle == "1Story", 1,
                           ifelse(total$HouseStyle == "2Story", 2,
                                  3))
-
+total$HouseStyle = as.factor(total$HouseStyle)
 total$RoofMatl = ifelse(total$RoofMatl == "CompShg", 1, 2)
+total$RoofMatl = as.factor(total$RoofMatl)
 total$RoofStyle = ifelse(total$RoofStyle == "Gable", 1,
                          ifelse(total$RoofStyle == "Hip", 2,
                                 3))
+total$RoofStyle = as.factor(total$RoofStyle)
 
-total$Exterior1st = as.character(total$Exterior1st)
-total$Exterior2nd = as.character(total$Exterior2nd)
-total$Exterior1st=if_else(total$Exterior1st %in% Ext1, "other", total$Exterior1st)
-total$Exterior2nd=if_else(total$Exterior2nd %in% Ext2, "other", total$Exterior2nd)
 total$SaleCondition = ifelse(total$SaleCondition=="Normal", 1, 2)
 total$SaleType = ifelse(total$SaleType == "WD", 1, 
                         ifelse(total$SaleType == "New", 2, 
@@ -129,6 +126,10 @@ total$year_garage2 = ifelse(total$GarageYrBlt <= 1950, 1,
 
 ##asgin remod year
 total$remodel_feature = ifelse(total$YearRemodAdd == total$YrSold, 1, 2)
+total$remodel_feature = as.factor(total$remodel_feature)
+#convert other categoricals into factors
+total$Exterior1st = as.factor(total$Exterior1st)
+total$Exterior2nd = as.factor(total$Exterior2nd)
 total$year_garage2 = as.factor(total$year_garage2)
 total$year_feature = as.factor(total$year_feature)
 total$year_feature2 = as.factor(total$year_feature2)
@@ -140,9 +141,24 @@ total$Condition2 = as.factor(total$Condition2)
 total$RoofMatl = as.factor(total$RoofMatl)
 total$MSSubClass = as.factor(total$MSSubClass)
 total$RoofStyle = as.factor(total$RoofStyle)
+total$remodel_feature = as.factor(total$remodel_feature)
+total$year_feature3_diff = as.factor(total$year_feature3_diff)
+total$year_feature4_diff_remod = as.factor(total$year_feature4_diff_remod)
+total$YrSold = as.factor(total$YrSold)
+total$BsmtHalfBath = as.factor(total$BsmtHalfBath)
+total$BsmtFullBath = as.factor(total$BsmtFullBath)
+total$FullBath = as.factor(total$FullBath)
+total$HalfBath = as.factor(total$HalfBath)
+total$BedroomAbvGr = as.factor(total$BedroomAbvGr)
+total$KitchenAbvGr = as.factor(total$KitchenAbvGr)
+total$TotRmsAbvGrd = as.factor(total$TotRmsAbvGrd)
+total$MoSold = as.factor(total$MoSold)
+total$SaleCondition = as.factor(total$SaleCondition)
+total$SaleType = as.factor(total$SaleType)
 colnames(total)[43:44]=c("floor1_SF", "floor2_SF")
 colnames(total)[68] =c("Porch_3ssn")
 ##split into test and train
+require(dplyr)
 train_home = total[1:1460,]
 train_home = filter(train_home, train_home$GrLivArea <= 4000) #remove outliers
 test_home = total[1461:nrow(total),]
@@ -154,7 +170,7 @@ sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_21dec_2.csv')
 
-mod2=glm(SalePrice~RoofMatl+floor1_SF+floor2_SF+Condition2+Neighborhood+LotArea+BsmtFinSF1+OverallQual+year_feature+GrLivArea+MSSubClass+GarageCars+BsmtQual, data = train_home)
+mod2=glm(SalePrice~., data = train_home)
 sales=predict(mod2, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
@@ -249,21 +265,20 @@ write_csv(sub, path = '~/Desktop/sub_housing_20dec_grid1.csv')
 
 ###simple XGB boost
 
-mmsparse = model.matrix(~.,train_home[-c(1, 73, 76, 6, 9, 58, 19, 20)])
+mmsparse = sparse.model.matrix(train_home$SalePrice~. -1,data=train_home[-c(1, 73, 6, 9, 58, 19, 20)])
 data1=Matrix(mmsparse, sparse = T)
-train1= list(train_home$SalePrice, data1)
+train1= list(train_home$SalePrice, mmsparse)
 
 names(train1) = c("label", "data")
-bstSparse=xgboost(data = train1$data, label = train1$label, max.depth = 2, eta = 1, nthread = 2, nround = 2)
+bstSparse=xgboost(data = train1$data, label = train1$label, max.depth = 2, eta = 1, nthread = 2, nround = 15000, objective = 'reg:linear', num_parallel_tree = 1000)
 
 
 
-mmsparse2 = model.matrix(~.,test_home[-c(1, 73, 76, 6, 9, 58, 19, 20)])
-data2 = Matrix(mmsparse2, sparse = T)
-sales = predict(bstSparse, data2)
+mmsparse2 = sparse.model.matrix(~.-1,data=test_home[-c(1, 73, 76, 6, 9, 58, 19, 20)])
+sales = predict(bstSparse, mmsparse2)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_21dec_XGBboost.csv')
+write.csv(sub, file = '~/Desktop/sub_housing_23dec_XGBboost2.csv')
 
 require(caret)
 require(xgboost)
@@ -271,15 +286,13 @@ require(xgboost)
 inTraining <- createDataPartition(train_home$SalePrice, p = .75, list = FALSE)
 training <- train_home[ inTraining,]
 testing  <-train_home[-inTraining,]
-train = model.matrix(~., training[-c(1, 73, 76, 6, 9, 58, 19, 20)])
-train1 = Matrix(train, sparse = T)
-test = model.matrix(~., testing[-c(1, 73, 76, 6, 9, 58, 19, 20)])
-test1 = Matrix(test, sparse = T)
+train = sparse.model.matrix(training$SalePrice ~. -1, data=training[-c(1, 2, 73, 6, 9, 58, 19, 20)])
+test = sparse.model.matrix(testing$SalePrice~. -1, data= testing[-c(1,2, 73, 6, 9, 58, 19, 20)])
 trainlabel = training$SalePrice
 testlabel = testing$SalePrice
 
-trainlist = list(trainlabel, train1)
-testlist = list(testlabel, test1)
+trainlist = list(trainlabel, train)
+testlist = list(testlabel, test)
 
 names(trainlist)= c("label", "data")
 names(testlist)= c("label", "data")
@@ -289,12 +302,7 @@ dtest <- xgb.DMatrix(data = testlist$data, label=testlist$label)
 
 watchlist <- list(train=dtrain, test=dtest)
 
-bst <- xgb.train(data=dtrain, max_depth=12, eta=0.02, alpha = 1,min_child_weight = 1,gamma = 2,nthread = 4, objective = 'reg:linear',  nrounds=20000, watchlist=watchlist, verbose = T, eval_metric = "error")
-
-label = getinfo(dtest, "label")
-pred <- predict(bst, dtest)
-err <- as.numeric(sum(as.integer(pred > 0.5) != label))/length(label)
-print(paste("test-error=", err))
+bst <- xgb.train(data=dtrain, max_depth=15,  alpha = 0.01, nthread = 8, objective = 'reg:linear',  nrounds=200, watchlist=watchlist, verbose = T, num_parallel_tree = 1000)
 
 
 model <- xgb.dump(bst, with.stats = T)
@@ -302,7 +310,11 @@ names=dimnames(train1)[[2]]
 importance_matrix <- xgb.importance(names, model = bst)
 print(importance_matrix)
 xgb.plot.importance(importance_matrix = importance_matrix)
-
+test_sparse = sparse.model.matrix(~.-1, data=test_home[-c(1, 73, 6, 9, 58, 19, 20, 76)])
+sales = predict(bst, test_sparse)
+sub=cbind.data.frame(test_home$Id, sales)
+colnames(sub) = c("Id", "SalePrice")
+write_csv(sub, path = '~/Desktop/sub_housing_22dec_XGBboost1.csv')
 ##predict
 test_home = as.data.frame(test_home)
 mmsparse2 = model.matrix(~.,test_home[-c(1, 73, 76, 6, 9, 58, 19, 20)])
@@ -310,7 +322,7 @@ data2 = Matrix(mmsparse2, sparse = T)
 sales = predict(bst, data2)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_22dec_XGBboost1.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_23dec_XGBboost1.csv')
 
 xgb_params = list(
   verbose =T,
