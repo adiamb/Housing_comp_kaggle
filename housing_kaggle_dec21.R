@@ -170,7 +170,8 @@ sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_21dec_2.csv')
 
-mod2=glm(SalePrice~., data = train_home)
+mod2=glm(SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)])
+summary(mod2)
 sales=predict(mod2, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
@@ -178,7 +179,7 @@ write_csv(sub, path = '~/Desktop/sub_housing_19dec_423pm.csv')
 
 
 require(randomForest)
-rf_model <- randomForest(SalePrice~.-Id, data = train_home)
+rf_model <- randomForest(SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)])
 predict(rf_model, test_home)
 importance=importance(rf_model)
 
@@ -194,14 +195,14 @@ ggplot(rankImportance, aes(x = reorder(Variables, Importance), y = Importance, f
 sales=predict(rf_model, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_21dec_rfmodel2.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_23dec_rfmodel1.csv')
 
 
 
 library(caret)
 set.seed(998)
-train_home2=train_home[-c(1, 19, 20, 73)]
-test_home2 =test_home[-c(1, 19, 20, 73, 76)]
+train_home2=train_home[-c(1, 73, 6, 9, 58, 19, 20)]
+test_home2 =train_home[-c(1, 73, 6, 9, 58, 19, 20)]
 test_mm2 = model.matrix(~., test_home2)
 mm1= model.matrix(~., train_home2)
 price = train_home$SalePrice/1000
@@ -226,9 +227,10 @@ fitControl <- trainControl(## 10-fold CV
   repeats = 10)
 
 set.seed(825)
-gbmFit1 <- train(SalePrice/1000 ~., data = training, 
+gbmFit1 <- train(SalePrice ~., data = training, 
                  method = "gbm", 
                  trControl = fitControl,
+                 train.fraction = 0.5,
                  ## This last option is actually one
                  ## for gbm() that passes through
                  verbose = T)
@@ -260,7 +262,7 @@ gbmFit2 <- train(SalePrice ~ ., data = training,
 sales=predict(gbmFit1, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_20dec_grid1.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_23dec_grid1.csv')
 
 
 ###simple XGB boost
@@ -270,7 +272,7 @@ data1=Matrix(mmsparse, sparse = T)
 train1= list(train_home$SalePrice, mmsparse)
 
 names(train1) = c("label", "data")
-bstSparse=xgboost(data = train1$data, label = train1$label, max.depth = 2, eta = 1, nthread = 2, nround = 15000, objective = 'reg:linear', num_parallel_tree = 1000)
+bstSparse=xgboost(data = train1$data, label = train1$label, max.depth = 15, alpha =0.01, nthread = 8, nround = 150, objective = 'reg:linear', num_parallel_tree = 100)
 
 
 
@@ -278,12 +280,12 @@ mmsparse2 = sparse.model.matrix(~.-1,data=test_home[-c(1, 73, 76, 6, 9, 58, 19, 
 sales = predict(bstSparse, mmsparse2)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write.csv(sub, file = '~/Desktop/sub_housing_23dec_XGBboost2.csv')
+write_csv(sub, path  = '~/Desktop/sub_housing_23dec_XGBboost3.csv')
 
 require(caret)
 require(xgboost)
 ### train an XGB boost model - split training data into test and training by caret package
-inTraining <- createDataPartition(train_home$SalePrice, p = .75, list = FALSE)
+inTraining <- createDataPartition(train_home$SalePrice, p = .50, list = FALSE)
 training <- train_home[ inTraining,]
 testing  <-train_home[-inTraining,]
 train = sparse.model.matrix(training$SalePrice ~. -1, data=training[-c(1, 2, 73, 6, 9, 58, 19, 20)])
@@ -302,7 +304,7 @@ dtest <- xgb.DMatrix(data = testlist$data, label=testlist$label)
 
 watchlist <- list(train=dtrain, test=dtest)
 
-bst <- xgb.train(data=dtrain, max_depth=15,  alpha = 0.01, nthread = 8, objective = 'reg:linear',  nrounds=200, watchlist=watchlist, verbose = T, num_parallel_tree = 1000)
+bst <- xgb.train(data=dtrain, max_depth=15,  alpha = 0.01, nthread = 8, objective = 'reg:linear',  nrounds=200, watchlist=watchlist, verbose = T, num_parallel_tree = 100)
 
 
 model <- xgb.dump(bst, with.stats = T)
