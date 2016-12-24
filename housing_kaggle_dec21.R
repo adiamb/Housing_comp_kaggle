@@ -14,27 +14,6 @@ total = rbind.data.frame(home_train, home_test, fill = T)
 plot(total$SalePrice, total$GrLivArea)
 total$OverallCond = as.factor(total$OverallCond)
 total$OverallQual= as.factor(total$OverallQual)
-#total$YearBuilt = as.character(as.numeric(total$YearBuilt))
-#total$YearRemodAdd = as.character(as.numeric(total$YearRemodAdd))
-
-total$year_feature = ifelse(total$YearBuilt <= 1900, 1,
-                            ifelse(total$YearBuilt >= 1901 & total$YearBuilt <= 1930, 2,
-                                   ifelse(total$YearBuilt >= 1931 & total$YearBuilt <= 1960, 3,
-                                          ifelse(total$YearBuilt >= 1961 & total$YearBuilt <= 1990, 4,
-                                                 5))))
-
-
-total$year_feature2 = ifelse(total$YearRemodAdd <= 1950, 1,
-                             ifelse(total$YearRemodAdd >= 1951 & total$YearRemodAdd <= 2000, 2,
-                                    3))
-
-
-total$year_feature3_diff = total$YrSold - total$YearBuilt
-total$year_feature4_diff_remod = total$YrSold - total$YearRemodAdd
-total$year_feature = as.factor(total$year_feature)
-total$year_feature2 = as.factor(total$year_feature2)
-
-
 
 
 ####model2#####################
@@ -85,8 +64,25 @@ total$Fence = NULL
 total$MiscFeature = NULL
 total$FireplaceQu = NULL
 str(total)
-
+####final dataframe!
+total_final = total
 ##do some feature enigneering 
+total$year_feature = ifelse(total$YearBuilt <= 1900, 1,
+                            ifelse(total$YearBuilt >= 1901 & total$YearBuilt <= 1930, 2,
+                                   ifelse(total$YearBuilt >= 1931 & total$YearBuilt <= 1960, 3,
+                                          ifelse(total$YearBuilt >= 1961 & total$YearBuilt <= 1990, 4,
+                                                 5))))
+
+
+total$year_feature2 = ifelse(total$YearRemodAdd <= 1950, 1,
+                             ifelse(total$YearRemodAdd >= 1951 & total$YearRemodAdd <= 2000, 2,
+                                    3))
+
+
+total$year_feature3_diff = total$YrSold - total$YearBuilt
+total$year_feature4_diff_remod = total$YrSold - total$YearRemodAdd
+total$year_feature = as.factor(total$year_feature)
+total$year_feature2 = as.factor(total$year_feature2)
 total$MSZoning = ifelse(total$MSZoning == "RL", 1, 2)
 total$MSZoning = as.factor(total$MSZoning)
 total$LotShape = ifelse(total$LotShape == "Reg", 1, 2)
@@ -157,20 +153,27 @@ total$SaleCondition = as.factor(total$SaleCondition)
 total$SaleType = as.factor(total$SaleType)
 colnames(total)[43:44]=c("floor1_SF", "floor2_SF")
 colnames(total)[68] =c("Porch_3ssn")
+
+
+
+
+
+
 ##split into test and train
 require(dplyr)
 train_home = total[1:1460,]
 train_home = filter(train_home, train_home$GrLivArea <= 4000) #remove outliers
 test_home = total[1461:nrow(total),]
-
-mod1=glm(SalePrice~SaleCondition+BldgType+GrLivArea+remodel_feature+LotArea+BsmtFullBath+GarageCars+GarageType+Neighborhood+OverallQual+BsmtExposure+BsmtFinSF1+BsmtFinSF2+KitchenQual+ScreenPorch+year_feature+year_garage2, data = train_home)
+train_home2 = train_home
+train_home2$GrLivArea = log(train_home2$GrLivArea)
+mod1=glm(SalePrice~SaleCondition+BldgType+GrLivArea+remodel_feature+LotArea+BsmtFullBath+GarageCars+GarageType+Neighborhood+OverallQual+BsmtExposure+BsmtFinSF1+BsmtFinSF2+KitchenQual+ScreenPorch+year_feature, data = train_home2)
 summary(mod1)
 sales=predict(mod1, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_21dec_2.csv')
 
-mod2=glm(SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)])
+mod2=glm(SalePrice~., data = train_home2[-c(1, 2, 73, 6, 9, 58, 19, 20)])
 summary(mod2)
 sales=predict(mod2, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
@@ -179,15 +182,19 @@ write_csv(sub, path = '~/Desktop/sub_housing_19dec_423pm.csv')
 
 
 require(randomForest)
-rf_model <- randomForest(SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)])
+rf_model <- randomForest(SalePrice~., data = train_home[-c(1, 73, 6, 9, 58, 19, 20)])
 predict(rf_model, test_home)
+##get rmse for the model
+pt_rf = predict(rf_model, train_home)
+error_rf = pt_rf - train_home$SalePrice
+rmse(error_rf)
 importance=importance(rf_model)
 
-varImportance <- data.frame(Variables = row.names(importance), 
+varImportance <- data.frame(Variables = row.names(importance),
 Importance = round(importance[ ,1]))
 
 # Create a rank variable based on importance
-rankImportance <- varImportance %>% mutate(Rank = paste0('#',dense_rank(desc(Importance))))
+rankImportance <- varImportance %>% mutate(Rank = paste0(dense_rank(desc(Importance))))
 
 # Use ggplot2 to visualize the relative importance of variables
 ggplot(rankImportance, aes(x = reorder(Variables, Importance), y = Importance, fill = Importance)) +geom_bar(stat='identity') + geom_text(aes(x = Variables, y = 0.5, label = Rank),hjust=0, vjust=0.55, size = 4, colour = 'red') +labs(x = 'Variables') +coord_flip()
@@ -195,28 +202,63 @@ ggplot(rankImportance, aes(x = reorder(Variables, Importance), y = Importance, f
 sales=predict(rf_model, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_23dec_rfmodel1.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_23dec_rfmodel2.csv')
 
+##take the top 32 features according to importance
+mostimpfeatures=rankImportance$Variables[rankImportance$Rank <= 32]
+mostimpfeatures = as.character(mostimpfeatures)
+mostimpfeatures = append(mostimpfeatures, "SalePrice")
+rf_model2 <- randomForest(SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)])
+predict(rf_model, test_home)
+##get rmse for the model
+pt_rf2 = predict(rf_model2, train_home)
+error_rf2 = pt_rf2 - train_home$SalePrice
+rmse(error_rf2)
+importance=importance(rf_model)
+
+
+require(e1071)
+rmse <- function(error)
+{
+  sqrt(mean(error^2))
+}
+
+svmfit1=svm(SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)])
+#rmse for this model
+pt_svm1 = predict(svmfit1, train_home)
+error_svm1 = pt_svm1 - train_home$SalePrice
+rmse(error_svm1)
+##predict on the test set
+sales=predict(svmfit1, test_home)
+sub=cbind.data.frame(test_home$Id, sales)
+colnames(sub) = c("Id", "SalePrice")
+write_csv(sub, path = '~/Desktop/sub_housing_23dec_svm.csv')
+
+tuneResult <- tune(svm, SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)],
+                   ranges = list(epsilon = seq(0,1,0.1), cost = 2^(2:9)))
+print(tuneResult)
+plot(tuneResult)
+tuneResult2 <- tune(svm, SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)],
+                   ranges = list(epsilon = seq(0,0.02,0.001), cost = 2^(2:4))) 
+
+print(tuneResult2$best.model)
+plot(tuneResult2)
+tunedmodel = tuneResult2$best.model
+###rmse
+pt_svm3 = predict(tunedmodel, train_home)
+error_svm3 = pt_svm3 - train_home$SalePrice
+rmse(error_svm3)
+###prediction
+tunedmodel = tuneResult2$best.model
+tunedmodeltp = predict(tunedmodel, test_home)
+sub=cbind.data.frame(test_home$Id, tunedmodeltp)
+colnames(sub) = c("Id", "SalePrice")
+write_csv(sub, path = '~/Desktop/sub_housing_24dec_svm_239pm.csv')
 
 
 library(caret)
 set.seed(998)
-train_home2=train_home[-c(1, 73, 6, 9, 58, 19, 20)]
-test_home2 =train_home[-c(1, 73, 6, 9, 58, 19, 20)]
-test_mm2 = model.matrix(~., test_home2)
-mm1= model.matrix(~., train_home2)
-price = train_home$SalePrice/1000
-require(glmnet)
-glmmodel = cv.glmnet(x=mm1, y=price, family = "gaussian", type.measure = "deviance", alpha = 0.6, nfolds = 10)
-plot(glmmodel)
-glmmodel$lambda
-glmmodel$lambda.min
-glmmodel$glmnet.fit$beta[which(glmmodel$glmnet.fit$beta[,51]!=0),51] %>% sort()
-sales=predict.cv.glmnet(glmmodel, test_mm2)
-sub=cbind.data.frame(test_home$Id, sales*1000)
-colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_20dec_glmnet.csv')
-
+train_home2=train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)]
 inTraining <- createDataPartition(train_home2$SalePrice, p = .75, list = FALSE)
 training <- train_home2[ inTraining,]
 testing  <-train_home2[-inTraining,]
@@ -230,7 +272,7 @@ set.seed(825)
 gbmFit1 <- train(SalePrice ~., data = training, 
                  method = "gbm", 
                  trControl = fitControl,
-                 train.fraction = 0.5,
+                 train.fraction = 0.75,
                  ## This last option is actually one
                  ## for gbm() that passes through
                  verbose = T)
@@ -259,7 +301,9 @@ gbmFit2 <- train(SalePrice ~ ., data = training,
                  ## Now specify the exact models 
                  ## to evaluate:
                  tuneGrid = gbmGrid)
-sales=predict(gbmFit1, test_home)
+sales=predict(gbmFit1, train_home)
+error = sales - train_home$SalePrice
+rmse(error)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_23dec_grid1.csv')
@@ -284,8 +328,9 @@ write_csv(sub, path  = '~/Desktop/sub_housing_23dec_XGBboost3.csv')
 
 require(caret)
 require(xgboost)
+require(Matrix)
 ### train an XGB boost model - split training data into test and training by caret package
-inTraining <- createDataPartition(train_home$SalePrice, p = .50, list = FALSE)
+inTraining <- createDataPartition(train_home$SalePrice, p = .75, list = FALSE)
 training <- train_home[ inTraining,]
 testing  <-train_home[-inTraining,]
 train = sparse.model.matrix(training$SalePrice ~. -1, data=training[-c(1, 2, 73, 6, 9, 58, 19, 20)])
