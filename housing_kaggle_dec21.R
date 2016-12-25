@@ -64,6 +64,8 @@ total$Fence = NULL
 total$MiscFeature = NULL
 total$FireplaceQu = NULL
 str(total)
+colnames(total)[43:44]=c("floor1_SF", "floor2_SF")
+colnames(total)[68] =c("Porch_3ssn")
 ####final dataframe!
 total_final = total
 ##do some feature enigneering 
@@ -79,6 +81,9 @@ total$year_feature2 = ifelse(total$YearRemodAdd <= 1950, 1,
                                     3))
 
 
+
+total$alllivingarea = total$floor1_SF+total$floor2_SF+total$GrLivArea+total$LowQualFinSF %>% sqrt()
+total$floorspace = total$floor1_SF+total$floor2_SF %>% sqrt()
 total$year_feature3_diff = total$YrSold - total$YearBuilt
 total$year_feature4_diff_remod = total$YrSold - total$YearRemodAdd
 total$year_feature = as.factor(total$year_feature)
@@ -138,8 +143,9 @@ total$RoofMatl = as.factor(total$RoofMatl)
 total$MSSubClass = as.factor(total$MSSubClass)
 total$RoofStyle = as.factor(total$RoofStyle)
 total$remodel_feature = as.factor(total$remodel_feature)
-total$year_feature3_diff = as.factor(total$year_feature3_diff)
-total$year_feature4_diff_remod = as.factor(total$year_feature4_diff_remod)
+total$GarageCars = as.factor(total$GarageCars)
+#total$year_feature3_diff = as.factor(total$year_feature3_diff)
+#total$year_feature4_diff_remod = as.factor(total$year_feature4_diff_remod)
 total$YrSold = as.factor(total$YrSold)
 total$BsmtHalfBath = as.factor(total$BsmtHalfBath)
 total$BsmtFullBath = as.factor(total$BsmtFullBath)
@@ -151,8 +157,7 @@ total$TotRmsAbvGrd = as.factor(total$TotRmsAbvGrd)
 total$MoSold = as.factor(total$MoSold)
 total$SaleCondition = as.factor(total$SaleCondition)
 total$SaleType = as.factor(total$SaleType)
-colnames(total)[43:44]=c("floor1_SF", "floor2_SF")
-colnames(total)[68] =c("Porch_3ssn")
+
 
 
 
@@ -180,9 +185,9 @@ sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_19dec_423pm.csv')
 
-
+train_home = as.data.frame(train_home)
 require(randomForest)
-rf_model <- randomForest(SalePrice~., data = train_home[-c(1, 73, 6, 9, 58, 19, 20)])
+rf_model <- randomForest(SalePrice~., data = train_home[-c(1, 2, 68, 69,  73, 6, 9, 58, 19, 20, 43, 44, 46, 45)])
 predict(rf_model, test_home)
 ##get rmse for the model
 pt_rf = predict(rf_model, train_home)
@@ -202,7 +207,7 @@ ggplot(rankImportance, aes(x = reorder(Variables, Importance), y = Importance, f
 sales=predict(rf_model, test_home)
 sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_23dec_rfmodel2.csv')
+write_csv(sub, path = '~/Desktop/sub_housing_24dec_rfmodel1.csv')
 
 ##take the top 32 features according to importance
 mostimpfeatures=rankImportance$Variables[rankImportance$Rank <= 32]
@@ -223,7 +228,7 @@ rmse <- function(error)
   sqrt(mean(error^2))
 }
 
-svmfit1=svm(SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)])
+svmfit1=svm(SalePrice~., data = train_home[-c(1, 2, 68, 69,  73, 6, 9, 58, 19, 20)])
 #rmse for this model
 pt_svm1 = predict(svmfit1, train_home)
 error_svm1 = pt_svm1 - train_home$SalePrice
@@ -234,16 +239,16 @@ sub=cbind.data.frame(test_home$Id, sales)
 colnames(sub) = c("Id", "SalePrice")
 write_csv(sub, path = '~/Desktop/sub_housing_23dec_svm.csv')
 
-tuneResult <- tune(svm, SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)],
+tuneResult <- tune(svm, SalePrice~., data = train_home[-c(1, 2, 68, 69,  73, 6, 9, 58, 19, 20)],
                    ranges = list(epsilon = seq(0,1,0.1), cost = 2^(2:9)))
 print(tuneResult)
 plot(tuneResult)
-tuneResult2 <- tune(svm, SalePrice~., data = train_home[-c(1, 2, 73, 6, 9, 58, 19, 20)],
-                   ranges = list(epsilon = seq(0,0.02,0.001), cost = 2^(2:4))) 
+tuneResult2 <- tune(svm, SalePrice~., data = train_home[-c(1, 2, 68, 69,  73, 6, 9, 58, 19, 20)],
+                   ranges = list(epsilon = seq(0,0.2,0.001), cost = 2^(2:9))) 
 
 print(tuneResult2$best.model)
 plot(tuneResult2)
-tunedmodel = tuneResult2$best.model
+tunedmodel = tuneResult$best.model
 ###rmse
 pt_svm3 = predict(tunedmodel, train_home)
 error_svm3 = pt_svm3 - train_home$SalePrice
@@ -253,7 +258,7 @@ tunedmodel = tuneResult2$best.model
 tunedmodeltp = predict(tunedmodel, test_home)
 sub=cbind.data.frame(test_home$Id, tunedmodeltp)
 colnames(sub) = c("Id", "SalePrice")
-write_csv(sub, path = '~/Desktop/sub_housing_24dec_svm_239pm.csv')
+write_csv(sub, path = '~/Dropbox/sub_housing_24dec_svm_6pm.csv')
 
 
 library(caret)
